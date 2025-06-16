@@ -165,6 +165,30 @@ Output should be a unified JSON array, with each task item containing the follow
   }
 ]
 ```
+
+---
+
+#### Example 4: Rethink and Planning Task 
+
+**User Input**:  
+> The usage method of LLM accelerated inference tools.
+
+**Previous TODO List**:
+......
+
+**Output**:
+```json
+[
+  {
+    "step": "1",
+    "sub_question": "Find the most relevant papers on LLM accelerated inference tools",
+  },
+  {
+    "step": "2",
+    "sub_question": "<|RETHINK AND PLANNING>| Based on the previous step, Rethink and plan the next step to search.",
+  }
+]
+```
 """
 
 # Generate optimal search keywords based on context and user question
@@ -172,31 +196,39 @@ EXPERT_KEYWORD_SYSTEM = """
 Generate the most suitable search keywords based on:
 User requirement: {question} 
 Context information: {ref_content} 
-Output only one set of optimal search keywords.
+For each core point, only output one set of optimal search keywords.
 
-Example 1:
+## Example 1:
 User requirement: I want to understand China's 2024 new energy vehicle export data and main export countries.
 Context: User is an automotive industry analyst focusing on Chinese NEV's overseas market performance.
-Output only one set of optimal search keywords.
+For each core point, only output one set of optimal search keywords.
 
 Output:
-2024 China new energy vehicle export data main export countries
+["2024 China new energy vehicle export data main export countries"]
 
-Example 2:
+## Example 2:
 User requirement: Help me find the latest price and user reviews for iPhone 15 Pro Max on US Amazon.
 Context: User plans to purchase iPhone 15 Pro Max in US, cares about price and authentic user feedback.
-Output only one set of optimal search keywords.
+For each core point, only output one set of optimal search keywords.
 
 Output:
-iPhone 15 Pro Max US Amazon price user reviews
+["iPhone 15 Pro Max US Amazon price user reviews"]
 
-Example 3:
+## Example 3:
 User requirement: Want to know Munich Germany May weather and suitable clothing.
 Context: User plans to visit Munich in May, concerned about weather impact on clothing choices.
-Output only one set of optimal search keywords.
+For each core point, only output one set of optimal search keywords.
 
 Output:
-Munich May weather clothing recommendations
+["Munich May weather clothing recommendations"]
+
+## Example 4:
+User requirement: What are the inference acceleration engines for large language models?
+Context: LLM acceleration engines are essential for large language models. Eclude vLLM、SGL......
+For each core point, only output one set of optimal search keywords.
+
+Output:
+["vllm", "SGL", "Deepspeed", .......]
 """
 
 # Judge whether the reference text satisfies the original user requirement

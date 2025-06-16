@@ -1,5 +1,6 @@
 import os
 import re
+import ast
 import json
 import httpx
 from abc import ABC
@@ -17,7 +18,7 @@ class WebSearchTool(ABC):
     name = "websearch"
     description = "Searching on the internet"
     param_anno: BaseModel = DeepResearchParams
-    llm = OpenAIClient(base_url=os.environ.get("BASE_URL","https://api.openai.com/v1"), api_key=os.environ.get("OpenAI_API_KEY"))
+    llm = OpenAIClient(base_url=os.environ.get("BASE_URL","https://api.openai.com/v1"), api_key=os.environ.get("OPEN_AI_KEY"))
 
     def web_search_bing(self, query: str, page_num: int = 3):
         """
@@ -134,6 +135,7 @@ class WebSearchTool(ABC):
         # Add relevance filtering using gpt-4o-mini to check if titles match user's query in kwargs["input"], keep only relevant URLs
         user_question = searchQuestion
         temp_response = await self.reranker_by_gpt(user_question, search_title)
+        # temp_response = await self.reranker_by_embedding(user_question, search_title)
         search_urls = [search_urls[idx] for idx in temp_response]
         search_title = [search_title[idx] for idx in temp_response]
         
@@ -171,8 +173,8 @@ class WebSearchTool(ABC):
             {"role":"system","content": EXPERT_PLANNING_SYSTEM},
             {"role":"user","content": searchQuery}
             ], model="gpt-4.1")
-        potential_keyword = json.loads(re.findall(r'\[\s*{.*?}\s*\]', str(potential_keyword.choices[0].message.content),re.DOTALL)[0])
-        
+        print(potential_keyword)
+        potential_keyword = ast.literal_eval(re.findall(r'\[\s*{.*?}\s*\]', str(potential_keyword.choices[0].message.content),re.DOTALL)[0])
         result = {} # Dictionary to store final results
         max_iterations = 3  # Max iterations to prevent infinite loops
         iteration = 0  # Iteration count
@@ -183,21 +185,40 @@ class WebSearchTool(ABC):
                 # Process search results
                 res_index = 0
                 for item in potential_keyword:
-                    # continue
-                    # Combine sub-question with search results to extract keywords from item['sub_question']
-                    temp_keyword = await self.llm([
-                        {"role":"system","content": EXPERT_KEYWORD_SYSTEM.replace("{ref_content}",str(result)).replace("{question}",item['sub_question'])},
-                        {"role":"user","content": item['sub_question']}
+                    if "<|RETHINK AND PLANNING>|" not in item['sub_question']:
+                        # continue
+                        # Combine sub-question with search results to extract keywords from item['sub_question']
+                        temp_keywords = await self.llm([
+                            {"role":"system","content": EXPERT_KEYWORD_SYSTEM.replace("{ref_content}",str(result)).replace("{question}",item['sub_question'])},
+                            {"role":"user","content": item['sub_question']}
+                            ], model="gpt-4.1")
+                        # 从temp_keyword.choices[0].message.content正则出列表
+                        print(temp_keywords.choices[0].message.content)
+                        try:
+                            temp_keywords = list(re.findall(r'\["(.*?)"\]', str(temp_keywords.choices[0].message.content),re.DOTALL))
+                        except:
+                            import sys
+                            print(temp_keywords)
+                            print(sys.exc_info()[-1].tb_lineno)
+                            temp_keywords = [temp_keywords]
+                        for temp_keyword in temp_keywords:
+                            temp_search_result = await self.search_by_bing(temp_keyword, "参考用户问题：["+str(item['sub_question'])+"]\n\n请结合搜索关键词:[{temp_keyword}]\n总结搜索到的网页的内容".replace("{temp_keyword}",temp_keyword))
+                            
+                        temp_summary = await self.llm([
+                            {"role":"system","content": SUMMARY_SYSTEM.replace("{ref_content}", str(temp_search_result))
+                                                    .replace("{question}", item['sub_question'])},
+                            {"role":"user","content": item['sub_question']}
+                            ], model="gpt-4.1")
+                        result[item['sub_question']] = temp_summary.choices[0].message.content
+                        res_index += 1
+                    
+                    else:
+                        potential_keyword = await self.llm([
+                        {"role":"system","content": EXPERT_PLANNING_SYSTEM},
+                        {"role":"user","content": searchQuery+"\n\nTODO List completed but task not finished, please continue planning: " + str(result)}
                         ], model="gpt-4.1")
-                    temp_search_result = self.search_by_bing(temp_keyword.choices[0].message.content, searchQuery)
-                        
-                    temp_summary = await self.llm([
-                        {"role":"system","content": SUMMARY_SYSTEM.replace("{ref_content}", str(temp_search_result))
-                                                .replace("{question}", item['sub_question'])},
-                        {"role":"user","content": item['sub_question']}
-                        ], model="gpt-4.1")
-                    result[item['sub_question']] = temp_summary.choices[0].message.content
-                    res_index += 1
+                        potential_keyword = ast.literal_eval(re.findall(r'\[\s*{.*?}\s*\]', str(potential_keyword.choices[0].message.content),re.DOTALL)[0])
+                        break
                     
                 # Call LLM to judge if result covers original question
                 temp_if_end = await self.llm([
@@ -210,7 +231,7 @@ class WebSearchTool(ABC):
                         {"role":"system","content": EXPERT_PLANNING_SYSTEM},
                         {"role":"user","content": searchQuery+"\n\nTODO List completed but task not finished, please continue planning: " + str(result)}
                         ], model="gpt-4.1")
-                    potential_keyword = json.loads(re.findall(r'\[\s*{.*?}\s*\]', str(potential_keyword.choices[0].message.content),re.DOTALL)[0])
+                    potential_keyword = ast.literal_eval(re.findall(r'\[\s*{.*?}\s*\]', str(potential_keyword.choices[0].message.content),re.DOTALL)[0])
 
                 
             except Exception as e:
@@ -224,5 +245,5 @@ class WebSearchTool(ABC):
         
 if __name__ == "__main__":
     import asyncio
-    response = asyncio.run(WebSearchTool().__call__(DeepResearchParams(searchQuery="how to learn python")))
+    response = asyncio.run(WebSearchTool().__call__(DeepResearchParams(searchQuery="llm加速推理引擎有哪些")))
     print(response)

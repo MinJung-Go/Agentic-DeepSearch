@@ -121,7 +121,7 @@ class Completions:
     
     def _handle_standard_response(self, url, headers, data) -> ChatCompletion:
         """处理标准响应"""
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=data, proxies={"https":"http://192.168.28.46:8118"})
         self._check_response_error(response)
         
         response_data = response.json()
@@ -247,7 +247,7 @@ class OpenAI:
         api_key: Optional[str] = None,
         base_url: str = "https://api.deepseek.com/v1"
     ):
-        self.api_key = api_key or os.environ.get("OpenAI_API_KEY")
+        self.api_key = api_key or os.environ.get("OPEN_AI_KEY")
         if not self.api_key:
             raise ValueError("API key must be provided either as an argument or via OpenAI_API_KEY environment variable")
             
